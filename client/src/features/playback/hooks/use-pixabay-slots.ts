@@ -21,7 +21,7 @@ const REFRESH_COOLDOWN_MS = 8000;
 const NEAR_END_TOLERANCE_SEC = 0.05;
 
 export type PixabaySlot = {
-  id: 'primary' | 'secondary';
+  id: 'primary' | 'secondary' | 'tertiary';
   ref: RefObject<HTMLVideoElement | null>;
   src: string;
   isActive: boolean;
@@ -468,7 +468,7 @@ export function usePixabaySlots(flavor: VideoFlavor, isPlaying: boolean): UsePix
   const slots: PixabaySlot[] = [
     { id: 'primary', ref: firstVideoRef, src: srcs[0], isActive: activeIdx === 0 },
     { id: 'secondary', ref: secondVideoRef, src: srcs[1], isActive: activeIdx === 1 },
-    { id: 'secondary', ref: thirdVideoRef, src: srcs[2], isActive: activeIdx === 2 },
+    { id: 'tertiary', ref: thirdVideoRef, src: srcs[2], isActive: activeIdx === 2 },
   ];
 
   return { slots, onActiveEnded: handleEnded };

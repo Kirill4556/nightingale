@@ -369,6 +369,7 @@
   "playback.hud.guideOff": "Führung aus",
   "playback.hud.guideOffShortcut": "Führung: aus",
   "playback.hud.guideOn": "Führung an",
+  "playback.hud.vocalsOnly": "Nur Gesang",
   "playback.hud.guidePercent": "Führung: {{percent}} %",
   "playback.hud.guidePercentShortcut": "Führung: {{percent}} % [G +/-]",
   "playback.hud.hideControls": "Regler ausblenden",

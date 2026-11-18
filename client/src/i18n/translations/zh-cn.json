@@ -369,6 +369,7 @@
   "playback.hud.guideOff": "引导关闭",
   "playback.hud.guideOffShortcut": "引导：关闭",
   "playback.hud.guideOn": "引导开启",
+  "playback.hud.vocalsOnly": "仅人声",
   "playback.hud.guidePercent": "引导：{{percent}}%",
   "playback.hud.guidePercentShortcut": "引导：{{percent}}% [G +/-]",
   "playback.hud.hideControls": "隐藏控件",

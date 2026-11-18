@@ -37,6 +37,7 @@ export type PlaybackTransportState = {
   paused: boolean;
   duration: number;
   guideVolume: number;
+  vocalsOnly: boolean;
   guideAvailable: boolean;
   error: string | null;
 };
@@ -46,6 +47,7 @@ export type PlaybackTransportActions = {
   getCurrentTime: () => number;
   seek: (time: number) => void;
   setGuideVolume: (volume: number) => void;
+  setVocalsOnly: (enabled: boolean) => void;
   getVocalsBuffer: AudioPlayer['getVocalsBuffer'];
   getScoringBuffer: AudioPlayer['getScoringBuffer'];
   getAudioContext: AudioPlayer['getAudioContext'];
@@ -161,6 +163,7 @@ export function PlaybackTransportProvider({
       paused,
       duration: audio.duration,
       guideVolume: audio.guideVolume,
+      vocalsOnly: audio.vocalsOnly,
       guideAvailable: audio.guideAvailable,
       error: audio.error,
     }),
@@ -170,6 +173,7 @@ export function PlaybackTransportProvider({
       audio.isFinished,
       audio.duration,
       audio.guideVolume,
+      audio.vocalsOnly,
       audio.guideAvailable,
       audio.error,
       paused,
@@ -182,6 +186,7 @@ export function PlaybackTransportProvider({
       getCurrentTime: audio.getCurrentTime,
       seek: audio.seek,
       setGuideVolume: audio.setGuideVolume,
+      setVocalsOnly: audio.setVocalsOnly,
       getVocalsBuffer: audio.getVocalsBuffer,
       getScoringBuffer: audio.getScoringBuffer,
       getAudioContext: audio.getAudioContext,
@@ -196,6 +201,7 @@ export function PlaybackTransportProvider({
       audio.getCurrentTime,
       audio.seek,
       audio.setGuideVolume,
+      audio.setVocalsOnly,
       audio.getVocalsBuffer,
       audio.getScoringBuffer,
       audio.getAudioContext,

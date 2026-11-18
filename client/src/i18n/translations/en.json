@@ -369,6 +369,7 @@
   "playback.hud.guideOff": "Guide off",
   "playback.hud.guideOffShortcut": "Guide: off",
   "playback.hud.guideOn": "Guide on",
+  "playback.hud.vocalsOnly": "Vocals only",
   "playback.hud.guidePercent": "Guide: {{percent}}%",
   "playback.hud.guidePercentShortcut": "Guide: {{percent}}% [G +/-]",
   "playback.hud.hideControls": "Hide controls",

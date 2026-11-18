@@ -2,8 +2,9 @@
  * Note-based scoring (transcript version 2).
  *
  * A frame of singing counts when the voice is within the difficulty tolerance
- * of the note, ignoring the octave. A note's accuracy is the share of its
- * duration that counted. The final score is 9000 points for notes (weighted by
+ * of the note, ignoring the octave, and no further than `TIMING_SLACK_SEC`
+ * from the note in time. A note's accuracy is the share of its duration that
+ * counted. The final score is 9000 points for notes (weighted by
  * duration and note type) plus 1000 points for lines sung at 80 % or better.
  *
  * This module has no imports on purpose: it runs unchanged in the app and in
@@ -28,7 +29,7 @@ export type LineResult = {
   line: number;
   /** 0..1, weighted by note duration and type. */
   accuracy: number;
-  /** The playhead has passed the last note of the line. */
+  /** The playhead has passed the timing window of the line's last note. */
   finished: boolean;
 };
 
@@ -72,6 +73,13 @@ export const QUALITY_MISS = 0.3;
 
 /** Longest gap between two updates that is still scored as continuous singing. */
 const MAX_FRAME_SEC = 0.1;
+
+/** Singing this early or late still counts for a note, in seconds. */
+export const TIMING_SLACK_SEC = 0.15;
+
+const windowStart = (note: ScoreNote): number => note.start - TIMING_SLACK_SEC;
+
+const windowEnd = (note: ScoreNote): number => note.end + TIMING_SLACK_SEC;
 
 type TranscriptNoteLike = {
   start: number;
@@ -163,7 +171,7 @@ export class NoteScoring {
   private readonly tolerance: number;
   private readonly totalWeight: number;
   private lastTime = 0;
-  /** First note that may still overlap the playhead. */
+  /** First note whose timing window may still overlap the playhead. */
   private cursor = 0;
 
   constructor(notes: readonly ScoreNote[], difficulty: Difficulty = DEFAULT_DIFFICULTY) {
@@ -182,14 +190,15 @@ export class NoteScoring {
   private rewind(time: number): void {
     for (let i = this.notes.length - 1; i >= 0; i--) {
       const note = this.notes[i];
-      if (note.end <= time) {
+      const opens = windowStart(note);
+      if (windowEnd(note) <= time) {
         continue;
       }
-      if (note.start >= time) {
+      if (opens >= time) {
         this.hit[i] = 0;
       } else {
-        const sungUntil = Math.min(this.lastTime, note.end);
-        const kept = sungUntil > note.start ? (time - note.start) / (sungUntil - note.start) : 0;
+        const sungUntil = Math.min(this.lastTime, windowEnd(note));
+        const kept = sungUntil > opens ? (time - opens) / (sungUntil - opens) : 0;
         this.hit[i] *= clamp01(kept);
       }
     }
@@ -212,15 +221,15 @@ export class NoteScoring {
       return;
     }
 
-    while (this.cursor < this.notes.length && this.notes[this.cursor].end <= from) {
+    while (this.cursor < this.notes.length && windowEnd(this.notes[this.cursor]) <= from) {
       this.cursor += 1;
     }
     for (let i = this.cursor; i < this.notes.length; i++) {
       const note = this.notes[i];
-      if (note.start >= time) {
+      if (windowStart(note) >= time) {
         break;
       }
-      const overlap = Math.min(time, note.end) - Math.max(from, note.start);
+      const overlap = Math.min(time, windowEnd(note)) - Math.max(from, windowStart(note));
       if (overlap > 0 && frameCounts(note, userSemitone, this.tolerance)) {
         this.hit[i] = Math.min(note.end - note.start, this.hit[i] + overlap);
       }
@@ -228,21 +237,29 @@ export class NoteScoring {
   }
 
   /**
-   * How the voice fits the note due at `time`, for colouring the voice line:
-   * `QUALITY_HIT` inside the tolerance, `QUALITY_NEAR` within twice the
-   * tolerance, `QUALITY_MISS` further away, 0 when no note is due or there is
-   * no voice.
+   * How the voice fits the notes whose timing window covers `time`, for
+   * colouring the voice line: the best of `QUALITY_HIT` inside the tolerance,
+   * `QUALITY_NEAR` within twice the tolerance, `QUALITY_MISS` further away;
+   * 0 when no note is due or there is no voice.
    */
   frameQuality(time: number, userSemitone: number | null): number {
     if (userSemitone === null) {
       return 0;
     }
-    const note = this.notes.find(
-      (candidate) => candidate.type !== 'free' && time >= candidate.start && time < candidate.end,
-    );
-    if (note === undefined) {
-      return 0;
+    let best = 0;
+    for (const note of this.notes) {
+      if (windowStart(note) > time) {
+        break;
+      }
+      if (note.type === 'free' || time >= windowEnd(note)) {
+        continue;
+      }
+      best = Math.max(best, this.pitchQuality(note, userSemitone));
     }
+    return best;
+  }
+
+  private pitchQuality(note: ScoreNote, userSemitone: number): number {
     if (note.pitch === null) {
       return QUALITY_HIT;
     }
@@ -268,7 +285,7 @@ export class NoteScoring {
       const line = lines.get(note.line) ?? { weight: 0, earned: 0, end: 0 };
       line.weight += weight;
       line.earned += weight * this.noteAccuracy(i);
-      line.end = Math.max(line.end, note.end);
+      line.end = Math.max(line.end, windowEnd(note));
       lines.set(note.line, line);
     });
     return [...lines.entries()]
@@ -297,7 +314,7 @@ export class NoteScoring {
       }
       const accuracy = this.noteAccuracy(i);
       earned += weight * accuracy;
-      if (note.end > this.lastTime) {
+      if (windowEnd(note) > this.lastTime) {
         return;
       }
       finishedWeight += weight;

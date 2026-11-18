@@ -379,6 +379,7 @@
   "playback.hud.guideOff": "Подсказка выкл.",
   "playback.hud.guideOffShortcut": "Подсказка: выкл.",
   "playback.hud.guideOn": "Подсказка вкл.",
+  "playback.hud.vocalsOnly": "Только вокал",
   "playback.hud.guidePercent": "Подсказка: {{percent}}%",
   "playback.hud.guidePercentShortcut": "Подсказка: {{percent}}% [G +/-]",
   "playback.hud.hideControls": "Скрыть управление",

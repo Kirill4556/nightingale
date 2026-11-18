@@ -104,6 +104,26 @@ function TouchButton({
   );
 }
 
+function VocalsOnlyButton() {
+  const { guideAvailable, vocalsOnly } = usePlaybackTransportState();
+  const { setVocalsOnly } = usePlaybackTransportActions();
+
+  if (!guideAvailable) {
+    return null;
+  }
+
+  return (
+    <button
+      type="button"
+      aria-pressed={vocalsOnly}
+      onClick={() => setVocalsOnly(!vocalsOnly)}
+      className={`pointer-events-auto rounded-sm border-2 border-white/70 px-2.5 py-1 text-sm text-white/90 transition-colors hover:bg-black/20 active:bg-black/30 ${vocalsOnly ? 'bg-white/30' : 'bg-black/10'}`}
+    >
+      {t('playback.hud.vocalsOnly')}
+    </button>
+  );
+}
+
 function SettingsInfo({
   guideVolume,
   guideAvailable,
@@ -219,6 +239,7 @@ function TouchControls({
       {open && (
         <div className="grid w-full grid-cols-3 gap-2 text-center">
           <TouchButton label={t('common.actions.pause')} onClick={handlePause} />
+          <VocalsOnlyButton />
           {guideAvailable && (
             <>
               <TouchButton
@@ -549,6 +570,7 @@ function PlaybackHudImpl({
               videoFlavor={videoFlavor}
               showShortcuts={!hasTouch}
             />
+            <VocalsOnlyButton />
           </div>
           <TouchControls config={config} hasTouch={hasTouch} position={position} />
         </div>

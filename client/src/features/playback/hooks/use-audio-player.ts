@@ -3,7 +3,8 @@
  * rAF tick that notifies subscribers for visuals (background sync, lyrics, HUD).
  * The returned API object is referentially stable across renders when its fields are unchanged.
  *
- * Graph: instrumental buffer → master gain → destination; vocals buffer → guide gain → master gain.
+ * Graph: instrumental buffer → instrumental gain → master gain → destination;
+ * vocals buffer → guide gain → master gain.
  * Playback position is derived from AudioContext.currentTime and a (offset, contextTimeAtStart)
  * pair because BufferSourceNode is one-shot: pause/seek recreate sources rather than mutating time.
  */
@@ -30,6 +31,7 @@ export type AudioPlayer = {
   isFinished: boolean;
   error: string | null;
   guideVolume: number;
+  vocalsOnly: boolean;
   /** False for LRC-provided songs without stems: the original mix plays and
    * there is no separate guide vocal track to control. */
   guideAvailable: boolean;
@@ -38,6 +40,7 @@ export type AudioPlayer = {
   resume: () => void;
   seek: (time: number) => void;
   setGuideVolume: (v: number) => void;
+  setVocalsOnly: (enabled: boolean) => void;
   cleanup: () => void;
   getVocalsBuffer: () => AudioBuffer | null;
   getScoringBuffer: () => AudioBuffer | null;
@@ -57,6 +60,8 @@ export function useAudioPlayer(
   const instrumentalSrcRef = useRef<AudioBufferSourceNode | null>(null);
   const vocalsSrcRef = useRef<AudioBufferSourceNode | null>(null);
   const vocalsGainRef = useRef<GainNode | null>(null);
+  const instrumentalGainRef = useRef<GainNode | null>(null);
+  const restoreGuideVolumeRef = useRef<number | null>(null);
   const masterGainRef = useRef<GainNode | null>(null);
   const rafRef = useRef<number>(0);
   const currentTimeRef = useRef(0);
@@ -75,6 +80,7 @@ export function useAudioPlayer(
   const [isFinished, setIsFinished] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [guideVolume, setGuideVolumeState] = useState(initialGuideVolume);
+  const [vocalsOnly, setVocalsOnlyState] = useState(false);
   const [guideAvailable, setGuideAvailable] = useState(true);
 
   const getVocalsBuffer = useCallback(() => vocalsBufRef.current, []);
@@ -133,9 +139,10 @@ export function useAudioPlayer(
       const instBuf = instrumentalBufRef.current;
       const vocBuf = vocalsBufRef.current;
       const gainNode = vocalsGainRef.current;
+      const instrumentalGainNode = instrumentalGainRef.current;
       const masterGainNode = masterGainRef.current;
 
-      if (!ctx || !instBuf || !masterGainNode) {
+      if (!ctx || !instBuf || !masterGainNode || !instrumentalGainNode) {
         return;
       }
 
@@ -145,7 +152,7 @@ export function useAudioPlayer(
 
       const instSrc = ctx.createBufferSource();
       instSrc.buffer = instBuf;
-      instSrc.connect(masterGainNode);
+      instSrc.connect(instrumentalGainNode);
 
       instSrc.addEventListener(
         'ended',
@@ -206,6 +213,10 @@ export function useAudioPlayer(
     masterGainNode.gain.value = Math.max(0, Math.min(1, initialMasterVolume));
     masterGainNode.connect(ctx.destination);
     masterGainRef.current = masterGainNode;
+
+    const instrumentalGainNode = ctx.createGain();
+    instrumentalGainNode.connect(masterGainNode);
+    instrumentalGainRef.current = instrumentalGainNode;
 
     const gainNode = ctx.createGain();
     gainNode.gain.value = Math.max(0, Math.min(1, initialGuideVolume));
@@ -312,9 +323,12 @@ export function useAudioPlayer(
       instrumentalBufRef.current = null;
       vocalsBufRef.current = null;
       vocalsGainRef.current = null;
+      instrumentalGainRef.current = null;
       masterGainRef.current = null;
-      void ctx.close();
-      ctxRef.current = null;
+      if (ctxRef.current === ctx) {
+        void ctx.close();
+        ctxRef.current = null;
+      }
     };
   }, [adapter, enabled, fileHash, initialGuideVolume, initialMasterVolume, stopSources]);
 
@@ -364,12 +378,33 @@ export function useAudioPlayer(
   const setGuideVolume = useCallback((v: number) => {
     const clamped = Math.max(0, Math.min(1, v));
 
+    restoreGuideVolumeRef.current = null;
     setGuideVolumeState(clamped);
 
     if (vocalsGainRef.current) {
       vocalsGainRef.current.gain.value = clamped;
     }
   }, []);
+
+  const setVocalsOnly = useCallback(
+    (vocalsOnlyEnabled: boolean) => {
+      if (vocalsOnlyEnabled && guideVolume === 0) {
+        setGuideVolume(0.3);
+        restoreGuideVolumeRef.current = 0;
+      } else if (!vocalsOnlyEnabled && restoreGuideVolumeRef.current !== null) {
+        setGuideVolume(restoreGuideVolumeRef.current);
+      }
+      setVocalsOnlyState(vocalsOnlyEnabled);
+      const gain = instrumentalGainRef.current?.gain;
+      const ctx = ctxRef.current;
+      if (gain && ctx) {
+        gain.cancelScheduledValues(ctx.currentTime);
+        gain.setValueAtTime(gain.value, ctx.currentTime);
+        gain.linearRampToValueAtTime(vocalsOnlyEnabled ? 0 : 1, ctx.currentTime + 0.02);
+      }
+    },
+    [guideVolume, setGuideVolume],
+  );
 
   const cleanup = useCallback(() => {
     cancelledRef.current = true;
@@ -392,12 +427,14 @@ export function useAudioPlayer(
       isFinished,
       error,
       guideVolume,
+      vocalsOnly,
       guideAvailable,
       play,
       pause,
       resume,
       seek,
       setGuideVolume,
+      setVocalsOnly,
       cleanup,
       getVocalsBuffer,
       getScoringBuffer,
@@ -412,12 +449,14 @@ export function useAudioPlayer(
       isFinished,
       error,
       guideVolume,
+      vocalsOnly,
       guideAvailable,
       play,
       pause,
       resume,
       seek,
       setGuideVolume,
+      setVocalsOnly,
       cleanup,
       getVocalsBuffer,
       getScoringBuffer,

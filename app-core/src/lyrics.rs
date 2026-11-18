@@ -93,9 +93,48 @@ pub struct SidecarLrc {
 
 const SIDECAR_LRC_MAX_BYTES: u64 = 1024 * 1024;
 
+/// True for text that looks like a bare domain, e.g. `Sefon.Pro`, `zaycev.net`.
+fn is_domain_like(text: &str) -> bool {
+    let parts: Vec<&str> = text.split('.').collect();
+    parts.len() >= 2
+        && parts
+            .iter()
+            .all(|part| !part.is_empty() && part.chars().all(|c| c.is_alphanumeric() || c == '-'))
+        && parts
+            .last()
+            .is_some_and(|tld| tld.chars().all(char::is_alphabetic))
+}
+
+/// Removes download-site labels such as `(Sefon.Pro)` or `[muzofond.fm]` that
+/// file tags often carry: LRCLIB finds nothing with them in the title.
+fn strip_site_labels(text: &str) -> String {
+    let mut out = String::with_capacity(text.len());
+    let mut rest = text;
+    while let Some(open) = rest.find(['(', '[']) {
+        let close_char = if rest[open..].starts_with('(') {
+            ')'
+        } else {
+            ']'
+        };
+        let Some(len) = rest[open + 1..].find(close_char) else {
+            break;
+        };
+        let inner = &rest[open + 1..open + 1 + len];
+        let after = &rest[open + 2 + len..];
+        if is_domain_like(inner.trim()) {
+            out.push_str(&rest[..open]);
+        } else {
+            out.push_str(&rest[..open + 2 + len]);
+        }
+        rest = after;
+    }
+    out.push_str(rest);
+    out.split_whitespace().collect::<Vec<_>>().join(" ")
+}
+
 pub(crate) fn lrclib_candidates(song: &Song) -> Vec<LrclibCandidate> {
-    let title = &song.title;
-    let artist = &song.artist;
+    let title = &strip_site_labels(&song.title);
+    let artist = &strip_site_labels(&song.artist);
 
     if title.is_empty() || artist == "Unknown Artist" {
         return Vec::new();
@@ -541,5 +580,26 @@ pub(crate) fn fetch_lrclib_lyrics(song: &Song, cache: &CacheDir) -> Option<PathB
             warn!("[lrclib] Failed to write lyrics: {e}");
             None
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::strip_site_labels;
+
+    #[test]
+    fn strips_site_labels_from_titles() {
+        assert_eq!(strip_site_labels("готика (Sefon.Pro)"), "готика");
+        assert_eq!(
+            strip_site_labels("архив [muzofond.fm] (Remix)"),
+            "архив (Remix)"
+        );
+        assert_eq!(
+            strip_site_labels("Song (feat. Someone)"),
+            "Song (feat. Someone)"
+        );
+        assert_eq!(strip_site_labels("Track (2.0)"), "Track (2.0)");
+        assert_eq!(strip_site_labels("Open (paren"), "Open (paren");
+        assert_eq!(strip_site_labels("Plain title"), "Plain title");
     }
 }

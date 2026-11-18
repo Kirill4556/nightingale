@@ -518,6 +518,7 @@ fn try_build_stream(
     targets: MicCaptureTargets,
     audio_shared: Arc<Mutex<VecDeque<f32>>>,
     monitor_enabled: Arc<AtomicBool>,
+    dropped_blocks: Arc<AtomicU32>,
 ) -> Option<cpal::Stream> {
     let ch = config.channels as usize;
     let push_samples: SampleSink = {
@@ -527,6 +528,9 @@ fn try_build_stream(
             let active_channel = strongest_input_channel(data, ch);
             let mut monitored_channels = Vec::new();
             let Ok(mut targets) = targets_cb.try_lock() else {
+                // Counted here and logged by the polling loop: the audio
+                // callback must not block or do I/O.
+                dropped_blocks.fetch_add(1, Ordering::Relaxed);
                 return;
             };
             for target in targets.values_mut() {
@@ -820,6 +824,7 @@ fn run_mic_loop(
         config.channels
     );
 
+    let dropped_blocks = Arc::new(AtomicU32::new(0));
     let Some(_stream) = try_build_stream(
         &device,
         &config,
@@ -827,6 +832,7 @@ fn run_mic_loop(
         Arc::clone(&targets),
         Arc::clone(&audio_shared),
         Arc::clone(&monitor_enabled),
+        Arc::clone(&dropped_blocks),
     ) else {
         let message = format!("failed to open microphone '{name}'");
         warn!("[mic] {message}");
@@ -874,6 +880,11 @@ fn run_mic_loop(
                 .lock()
                 .unwrap_or_else(|poisoned| poisoned.into_inner())
                 .clear();
+        }
+
+        let dropped = dropped_blocks.swap(0, Ordering::Relaxed);
+        if dropped > 0 {
+            warn!("[mic] '{name}': {dropped} input block(s) dropped, capture buffer was busy");
         }
 
         for (capture_id, samples) in drain_recorded(&targets) {

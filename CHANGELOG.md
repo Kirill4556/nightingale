@@ -15,7 +15,8 @@ below.
 
 ### Features
 
-- Songs are now scored by their notes: each note counts when you sing it within the chosen difficulty (easy, medium or hard, set in Playback settings), for up to 10,000 points. Accuracy and combo show under the score, and the results screen breaks accuracy down line by line. Older results stay on their own scale.
+- Switch to vocals-only playback without restarting the song when separate vocal and instrumental tracks are available.
+- Songs are now scored by their notes: each note counts when you sing it within the chosen difficulty (easy, medium or hard, set in Playback settings), and coming in a little early or late is forgiven, for up to 10,000 points. Accuracy and combo show under the score, and the results screen breaks accuracy down line by line. Older results stay on their own scale.
 - The pitch graph draws the melody as notes, colours your voice by whether it hits them, and shows arrows to go higher or lower plus an octave mark.
 - Analysis now extracts the melody of each song; songs analyzed earlier get it the first time they are opened. Song details show the vocal range, which follows key shifts.
 - Words now fill with colour from left to right as they are sung. Choose the fill colour, outline and font in Playback settings.
@@ -31,6 +32,9 @@ below.
 
 - Lyrics and pitch graph are larger by default.
 - UltraStar songs no longer show spaces inside words split into syllables.
+- Pixabay video backgrounds switch between clips more reliably.
+- Lyrics are found online for songs whose title carries a download-site label such as "(Sefon.Pro)".
+- Dropped microphone input is now reported in the log.
 
 ## [1.4.1] - 2026-11-09
 
